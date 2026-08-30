@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#
+# eitb -- launcher for the Nim binding's CLI demonstrator. Compiles
+# the binary on first use (or after a source change), then forwards
+# every argument to it.
+
+set -eu
+set -o pipefail
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN="$DIR/build/itb_eitb"
+
+if [[ ! -x "$BIN" || "$DIR/itb_eitb.nim" -nt "$BIN" ]]; then
+    nim c -d:release --hints:off --outdir:"$DIR/build" \
+        --nimcache:"$DIR/build/nimcache" "$DIR/itb_eitb.nim" >&2
+fi
+
+exec "$BIN" "$@"

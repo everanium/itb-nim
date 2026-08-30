@@ -1,0 +1,6 @@
+nimcache/
+*.exe
+build/
+tests/build/
+bench/build/
+eitb/build/
