@@ -251,3 +251,23 @@ suite "itb nim binding":
     check (back == plain) == true
     receiver.free()
     sender.free()
+
+  test "per-call innerHashes override round trip":
+    # The single-primitive width-512 base profile takes an 8-slot
+    # per-call MixedHashes override (Go-side Opts.MixedHashes, wired
+    # through the innerHashes= opts key). Round-trip proves the typed
+    # helper's comma-join lands in the Go parser correctly.
+    let mix = [
+      "areion512", "blake2b512", "areion512", "blake2b512",
+      "areion512", "blake2b512", "areion512", "blake2b512",
+    ]
+    let senderOpts = Opts().withInnerHashes(mix)
+    let receiverOpts = Opts().withInnerHashes(mix)
+    let sender = initPipeline("singlemsg-triple-mac-v1", senderOpts)
+    let receiver = openPipeline("singlemsg-triple-mac-v1", sender.blob, receiverOpts)
+    let plain = "per-call inner-hashes override round-trip payload"
+    let wire = sender.encryptMessage(plain)
+    check receiver.decryptMessage(wire) ==
+        @(plain.toOpenArrayByte(0, plain.len - 1))
+    receiver.free()
+    sender.free()
