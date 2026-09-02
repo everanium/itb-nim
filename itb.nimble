@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.3.3"
+version       = "0.3.4"
 author        = "everanium"
 description   = "Thin Nim proxy over the libitb shared library's Triple Pipeline surface"
 license       = "MIT"
