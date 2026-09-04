@@ -3,20 +3,20 @@
 ## Subcommands:
 ##
 ##     itb_eitb version                                library + binding versions
-##     itb_eitb hashes                                 shipped hash primitive roster
-##     itb_eitb profiles                               built-in Triple profile names
+##     itb_eitb profiles                               registered profile catalogue
 ##     itb_eitb encrypt <profile> <in-file> <out-file> Single Message encrypt
 ##     itb_eitb decrypt <profile> <blob-hex> <in-file> <out-file>
 ##
 ## `encrypt` prints the session blob to stderr as hex; feed that hex
-## back to `decrypt` on the receiving side.
+## back to `decrypt` on the receiving side. `profiles` lists the
+## registered profile catalogue one name per line; the profiles that
+## carry a cipher surface are the ones `encrypt` / `decrypt` accept.
 
 import std/[os, strformat, strutils]
 import ../src/itb
 import ../src/itb/stream
 
 const Usage = """usage: eitb version
-       eitb hashes
        eitb profiles
        eitb encrypt <profile> <in-file> <out-file>
        eitb decrypt <profile> <blob-hex> <in-file> <out-file>"""
@@ -48,10 +48,6 @@ proc fromHexStr(s: string): seq[byte] =
 proc cmdVersion() =
   echo "libitb " & version()
   echo "itb-nim " & ItbNimVersion
-
-proc cmdHashes() =
-  for i, h in hashes():
-    echo &"{i:>2}  {h.name:<12} {h.width} bits"
 
 proc cmdProfiles() =
   for name in profiles():
@@ -89,13 +85,15 @@ proc cmdEncrypt(profile, infile, outfile: string) =
     else: pipe.encryptMessage(plain)
   ensureParentDir(outfile)
   writeFileBytes(outfile, wire)
-  stderr.writeLine(toHexStr(pipe.blob))
+  stderr.writeLine(toHexStr(pipe.save))
   echo &"encrypted {infile} -> {outfile} ({plain.len} -> {wire.len} bytes)"
 
 proc cmdDecrypt(profile, blobHex, infile, outfile: string) =
   let blob = fromHexStr(blobHex)
   let wire = readFileBytes(infile)
-  let pipe = openPipeline(profile, blob)
+  # The profile shape travels inside the blob; the profile argument
+  # only selects the Single Message or streaming cipher pair.
+  let pipe = loadPipeline(blob)
   defer: pipe.free()
   let plain =
     if isStreamingProfile(profile): streamOneShotDecrypt(pipe, wire)
@@ -107,7 +105,7 @@ proc cmdDecrypt(profile, blobHex, infile, outfile: string) =
 proc main(): int =
   let argv = commandLineParams()
   let knownShape =
-    (argv.len == 1 and argv[0] in ["version", "hashes", "profiles"]) or
+    (argv.len == 1 and argv[0] in ["version", "profiles"]) or
     (argv.len == 4 and argv[0] == "encrypt") or
     (argv.len == 5 and argv[0] == "decrypt")
   if not knownShape:
@@ -119,7 +117,6 @@ proc main(): int =
     discard setGcPercent(20)
     case argv[0]
     of "version": cmdVersion()
-    of "hashes": cmdHashes()
     of "profiles": cmdProfiles()
     of "encrypt": cmdEncrypt(argv[1], argv[2], argv[3])
     else: cmdDecrypt(argv[1], argv[2], argv[3], argv[4])

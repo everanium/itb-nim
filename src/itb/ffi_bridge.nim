@@ -59,10 +59,6 @@ proc itbLibPath*(): string =
 
 proc ITB_Version*(outBuf: pointer, capBytes: csize_t,
                   outLen: ptr csize_t): cint
-proc ITB_HashCount*(): cint
-proc ITB_HashName*(i: cint, outBuf: pointer, capBytes: csize_t,
-                   outLen: ptr csize_t): cint
-proc ITB_HashWidth*(i: cint): cint
 proc ITB_LastError*(outBuf: pointer, capBytes: csize_t,
                     outLen: ptr csize_t): cint
 proc ITB_SetMemoryLimit*(limit: int64): int64
@@ -71,11 +67,20 @@ proc ITB_SetGCPercent*(pct: cint): cint
 proc ITB_Triple_Init*(profile: cstring, opts: cstring, blobOut: pointer,
                       blobCap: csize_t, blobLen: ptr csize_t,
                       outHandle: ptr csize_t): cint
-proc ITB_Triple_Open*(profile: cstring, blob: pointer, blobLen: csize_t,
-                      opts: cstring, permMaster: pointer,
-                      permMasterLen: csize_t, wrapMaster: pointer,
-                      wrapMasterLen: csize_t, mastersCount: csize_t,
-                      outHandle: ptr csize_t): cint
+proc ITB_Triple_Load*(blob: pointer, blobLen: csize_t,
+                      permMaster: pointer, permMasterLen: csize_t,
+                      wrapMaster: pointer, wrapMasterLen: csize_t,
+                      mastersCount: csize_t, outHandle: ptr csize_t): cint
+proc ITB_Triple_LoadF*(path: cstring,
+                       permMaster: pointer, permMasterLen: csize_t,
+                       wrapMaster: pointer, wrapMasterLen: csize_t,
+                       mastersCount: csize_t, outHandle: ptr csize_t): cint
+proc ITB_Triple_Save*(handle: csize_t, blobOut: pointer, blobCap: csize_t,
+                      blobLen: ptr csize_t): cint
+proc ITB_Triple_SaveF*(handle: csize_t, path: cstring): cint
+proc ITB_Triple_Inspect*(blob: pointer, blobLen: csize_t, jsonOut: pointer,
+                         jsonCap: csize_t, jsonLen: ptr csize_t): cint
+proc ITB_Triple_MaxWorkers*(handle: csize_t, n: cint): cint
 proc ITB_Triple_Rekey*(handle: csize_t, permMaster: pointer,
                        permMasterLen: csize_t, wrapMaster: pointer,
                        wrapMasterLen: csize_t, blobOut: pointer,
@@ -94,7 +99,11 @@ proc ITB_Triple_EncryptMessage*(handle: csize_t, plaintext: pointer,
 proc ITB_Triple_DecryptMessage*(handle: csize_t, wire: pointer,
                                 wireLen: csize_t, outBuf: pointer,
                                 outCap: csize_t, outLen: ptr csize_t): cint
-proc ITB_Triple_RegisterProfile*(name: cstring, opts: cstring): cint
+proc ITB_Triple_Register*(name: cstring, profileJson: cstring): cint
+proc ITB_Triple_Lookup*(name: cstring, jsonOut: pointer, jsonCap: csize_t,
+                        jsonLen: ptr csize_t): cint
+proc ITB_Triple_Profiles*(jsonOut: pointer, jsonCap: csize_t,
+                          jsonLen: ptr csize_t): cint
 proc ITB_Triple_EncryptStreamBegin*(pipe: csize_t,
                                     outStream: ptr csize_t): cint
 proc ITB_Triple_DecryptStreamBegin*(pipe: csize_t,

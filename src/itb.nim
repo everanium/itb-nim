@@ -16,7 +16,7 @@
 ##   import itb
 ##
 ##   let sender = initPipeline("singlemsg-triple-mac-v1")
-##   let receiver = openPipeline("singlemsg-triple-mac-v1", sender.blob)
+##   let receiver = loadPipeline(sender.save)
 ##   let wire = sender.encryptMessage("hello")
 ##   assert receiver.decryptMessage(wire) == @("hello".toOpenArrayByte(0, 4))
 
@@ -28,6 +28,6 @@ import itb/runtime
 
 export errors, opts, pipeline, stream, runtime
 
-const ItbNimVersion* = "0.3.5"
+const ItbNimVersion* = "0.4.1"
   ## Binding version. Tracks the Nim wrapper; call ``version()`` for
   ## the underlying libitb library version.

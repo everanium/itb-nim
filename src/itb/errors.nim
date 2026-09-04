@@ -3,8 +3,9 @@
 ##
 ## The numeric codes mirror the libitb C ABI
 ## (``cmd/cshared/internal/capi/errors.go``) and are stable across
-## releases. Codes 11..17 are a reserved sentinel block; 19..22 belong
-## to the native Blob surface (not wrapped here but relayed verbatim
+## releases. Codes 11..13 are the Triple blob-record / registry
+## sentinels, 14..17 a reserved block; 19..22 belong to the native
+## Blob surface (not wrapped here but relayed verbatim
 ## if libitb ever returns them).
 
 type
@@ -21,9 +22,9 @@ type
     stSeedWidthMix = 8
     stBadMac = 9
     stMacFailure = 10
-    stReserved11 = 11
-    stReserved12 = 12
-    stReserved13 = 13
+    stBlobMalformedRecipe = 11
+    stRecipePrimitiveUnknown = 12
+    stUnknownProfile = 13
     stReserved14 = 14
     stReserved15 = 15
     stReserved16 = 16
@@ -66,8 +67,10 @@ func label*(s: Status): string =
   of stSeedWidthMix: "seed width mismatch"
   of stBadMac: "unknown MAC name or invalid MAC handle"
   of stMacFailure: "MAC verification failed"
-  of stReserved11, stReserved12, stReserved13, stReserved14,
-     stReserved15, stReserved16, stReserved17: "reserved status"
+  of stBlobMalformedRecipe: "blob recipe malformed"
+  of stRecipePrimitiveUnknown: "blob recipe names an unknown primitive"
+  of stUnknownProfile: "unknown profile name"
+  of stReserved14, stReserved15, stReserved16, stReserved17: "reserved status"
   of stBlobModeMismatch: "blob mode mismatch"
   of stBlobMalformed: "malformed state blob"
   of stBlobVersionTooNew: "blob version too new"
@@ -93,9 +96,9 @@ func statusFrom*(code: int): Status =
   of 8: stSeedWidthMix
   of 9: stBadMac
   of 10: stMacFailure
-  of 11: stReserved11
-  of 12: stReserved12
-  of 13: stReserved13
+  of 11: stBlobMalformedRecipe
+  of 12: stRecipePrimitiveUnknown
+  of 13: stUnknownProfile
   of 14: stReserved14
   of 15: stReserved15
   of 16: stReserved16

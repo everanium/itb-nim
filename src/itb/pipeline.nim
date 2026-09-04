@@ -4,12 +4,18 @@
 ## ORC via the embedded handle's ``=destroy`` hook; explicit ``free``
 ## (or ``close``) releases the Go-side state deterministically.
 
+import std/json
+
 import ./errors
 import ./ffi_bridge
 import ./opts
+import ./profile
+
+export profile
 
 const
-  ## Floor capacity for blob output buffers (Init / Rekey).
+  ## Floor capacity for blob / JSON output buffers (Init / Rekey /
+  ## Save / Inspect / Lookup / Profiles).
   BlobCap = 64 * 1024
 
 type
@@ -19,16 +25,15 @@ type
     h: csize_t
 
   Pipeline* = ref object
-    ## A Triple Pipeline session plus its exported blob bytes.
+    ## A Triple Pipeline session.
     ##
-    ## The blob carries the session bundle the receiver feeds to
-    ## ``openPipeline``; ``rekey`` refreshes it.
+    ## ``save`` exports the session bundle the receiver feeds to
+    ## ``loadPipeline``; ``rekey`` refreshes it.
     ##
     ## Streaming-decrypt caveat: chunked Streaming AEAD verifies per
     ## chunk, so plaintext of verified chunks is released before a
     ## later chunk can fail authentication.
     raw: PipeHandle
-    blobBytes: seq[byte]
 
 proc `=copy`(dest: var PipeHandle, src: PipeHandle) {.error.}
 
@@ -67,53 +72,87 @@ func rawHandle*(p: Pipeline): csize_t =
   p.raw.h
 
 proc initPipeline*(profile: string, opts = Opts()): Pipeline =
-  ## Constructs a fresh Pipeline against the named profile. On a
-  ## blob-buffer retry the Init re-runs and yields a fresh session
-  ## (the undersized attempt is closed by libitb before returning).
+  ## Constructs a fresh Pipeline against the named profile. The
+  ## session bundle is available through ``save``. On a blob-buffer
+  ## retry the Init re-runs and yields a fresh session (the undersized
+  ## attempt is closed by libitb before returning).
   let optsStr = opts.build
   var handle: csize_t = 0
-  let blob = retryOnce(BlobCap,
+  discard retryOnce(BlobCap,
     proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
       ITB_Triple_Init(profile.cstring, optsStr.cstring, buf, cap, n,
                       addr handle))
-  Pipeline(raw: PipeHandle(h: handle), blobBytes: blob)
+  Pipeline(raw: PipeHandle(h: handle))
 
-proc openPipeline*(profile: string, blob: openArray[byte], opts = Opts(),
+func mastersCount(permLen, wrapLen: int): csize_t =
+  ## The masters pair crosses as (perm, wrap, count): both absent
+  ## yields 0, otherwise 2 — libitb validates the pair.
+  if permLen == 0 and wrapLen == 0: 0 else: 2
+
+proc loadPipeline*(blob: openArray[byte],
                    permMaster: openArray[byte] = [],
                    wrapMaster: openArray[byte] = []): Pipeline =
-  ## Reconstructs a Pipeline from a blob produced by ``initPipeline``
-  ## or ``rekey``. Leave both masters empty to use the blob-embedded
-  ## masters; to override, both must be supplied non-empty (a
-  ## half-supplied pair is rejected).
-  if blob.len == 0:
-    raise newItbError(stBadInput, ord(stBadInput), "empty session blob")
-  if (permMaster.len > 0) != (wrapMaster.len > 0):
-    raise newItbError(stBadInput, ord(stBadInput),
-                      "master override buffers must both be non-empty")
-  let optsStr = opts.build
-  let mastersCount: csize_t = if permMaster.len > 0: 2 else: 0
+  ## Reconstructs a Pipeline from a blob produced by ``save`` or
+  ## ``rekey``. Leave both masters empty to use the blob-embedded
+  ## masters; supply both to override them (the pair is validated by
+  ## libitb). The profile shape travels inside the blob — no profile
+  ## name, no opts. A blob whose record names a primitive absent from
+  ## the local build fails with ``stRecipePrimitiveUnknown``; a
+  ## record failing the profile field rules with
+  ## ``stBlobMalformedRecipe``.
   var handle: csize_t = 0
-  check(ITB_Triple_Open(profile.cstring, toPtr(blob), csize_t(blob.len),
-                        optsStr.cstring,
+  check(ITB_Triple_Load(toPtr(blob), csize_t(blob.len),
                         toPtr(permMaster), csize_t(permMaster.len),
                         toPtr(wrapMaster), csize_t(wrapMaster.len),
-                        mastersCount, addr handle))
-  Pipeline(raw: PipeHandle(h: handle), blobBytes: @blob)
+                        mastersCount(permMaster.len, wrapMaster.len),
+                        addr handle))
+  Pipeline(raw: PipeHandle(h: handle))
 
-func blob*(p: Pipeline): seq[byte] =
-  ## The exported session bundle bytes for the receiver side.
-  p.blobBytes
+proc loadPipelineF*(path: string,
+                    permMaster: openArray[byte] = [],
+                    wrapMaster: openArray[byte] = []): Pipeline =
+  ## ``loadPipeline`` for a blob stored at ``path``; the file is read
+  ## inside libitb (a missing or unreadable file fails with
+  ## ``stBadInput`` and the diagnostic attached).
+  var handle: csize_t = 0
+  check(ITB_Triple_LoadF(path.cstring,
+                         toPtr(permMaster), csize_t(permMaster.len),
+                         toPtr(wrapMaster), csize_t(wrapMaster.len),
+                         mastersCount(permMaster.len, wrapMaster.len),
+                         addr handle))
+  Pipeline(raw: PipeHandle(h: handle))
 
-proc rekey*(p: Pipeline, perm, wrap: openArray[byte]) =
-  ## Rotates the parallax + wrapper masters and refreshes ``blob``.
-  ## Must not run concurrently with cipher calls or open stream
-  ## sessions on the same Pipeline.
+proc save*(p: Pipeline): seq[byte] =
+  ## The current session bundle bytes for the receiver side (the Init
+  ## blob, or the bytes of the latest ``rekey``). A closed Pipeline
+  ## fails with ``stTripleClosed``.
+  let handle = p.raw.h
+  retryOnce(BlobCap,
+    proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
+      ITB_Triple_Save(handle, buf, cap, n))
+
+proc saveF*(p: Pipeline, path: string) =
+  ## Writes the current blob to ``path`` inside libitb (mode 0600; the
+  ## containing directory must exist).
+  check(ITB_Triple_SaveF(p.raw.h, path.cstring))
+
+proc maxWorkers*(p: Pipeline, n: int) =
+  ## Sets the worker cap for every subsequent cipher call. ``n`` is
+  ## clamped by libitb (``<= 0`` selects auto, ``> 256`` becomes 256);
+  ## only the handle state is reported. The cap is per-machine and
+  ## never travels in the blob.
+  check(ITB_Triple_MaxWorkers(p.raw.h, cint(n)))
+
+proc rekey*(p: Pipeline, perm, wrap: openArray[byte]): seq[byte] {.discardable.} =
+  ## Rotates the parallax + wrapper masters and returns the fresh blob
+  ## (also available through ``save``). Must not run concurrently with
+  ## cipher calls or open stream sessions on the same Pipeline.
   let handle = p.raw.h
   # openArray params cannot be captured by a closure — pin the
   # borrowed pointers and lengths first.
   let (permPtr, permLen) = (toPtr(perm), csize_t(perm.len))
   let (wrapPtr, wrapLen) = (toPtr(wrap), csize_t(wrap.len))
-  p.blobBytes = retryOnce(max(BlobCap, p.blobBytes.len),
+  retryOnce(BlobCap,
     proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
       ITB_Triple_Rekey(handle, permPtr, permLen,
                        wrapPtr, wrapLen, buf, cap, n))
@@ -229,15 +268,43 @@ proc decryptStreamOneShotInto*(p: Pipeline, wire: openArray[byte],
   ## ``dst[0 ..< result]`` is the plaintext.
   cipherCallInto(p, ITB_Triple_DecryptStream, wire, dst)
 
-proc registerProfile*(name: string, opts: Opts) =
+proc jsonOf(raw: seq[byte]): string =
+  result = newString(raw.len)
+  if raw.len > 0:
+    copyMem(addr result[0], unsafeAddr raw[0], raw.len)
+
+proc inspect*(blob: openArray[byte]): Profile =
+  ## Decodes the profile record embedded in ``blob`` without
+  ## constructing a Pipeline. No registry read, no primitive probe —
+  ## a primitive name the local build lacks is returned unchanged.
+  let (blobPtr, blobLen) = (toPtr(blob), csize_t(blob.len))
+  let raw = retryOnce(BlobCap,
+    proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
+      ITB_Triple_Inspect(blobPtr, blobLen, buf, cap, n))
+  Profile.fromJson(jsonOf(raw))
+
+proc register*(name: string, profile: Profile) =
   ## Registers a user-defined Triple profile under ``name`` so
-  ## subsequent ``initPipeline`` / ``openPipeline`` calls resolve it.
-  ## The opts follow the register-profile grammar validated by Go
-  ## (``mode``, ``width``, ``innerHash`` / ``innerHashes``,
-  ## ``keyBits``, ``macName``, ``outerCipher``, ``parallaxPalette``,
-  ## ``parallaxSegmentSize``, ``chunkSize``, ``parallaxOn``,
-  ## ``wrapperOn``) — build them with ``withRaw`` plus the typed
-  ## setters where key names coincide. A duplicate name fails with
-  ## ``stProfileExists``.
-  let optsStr = opts.build
-  check(ITB_Triple_RegisterProfile(name.cstring, optsStr.cstring))
+  ## subsequent ``initPipeline`` calls resolve it. The record's field
+  ## rules are validated by libitb; a duplicate name fails with
+  ## ``stProfileExists``. A non-empty ``profile.name`` must equal
+  ## ``name``.
+  let json = profile.toJson
+  check(ITB_Triple_Register(name.cstring, json.cstring))
+
+proc lookup*(name: string): Profile =
+  ## Returns the profile registered under ``name`` — a shipped
+  ## catalogue entry or a prior ``register`` call. An unregistered
+  ## name fails with ``stUnknownProfile``.
+  let raw = retryOnce(BlobCap,
+    proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
+      ITB_Triple_Lookup(name.cstring, buf, cap, n))
+  Profile.fromJson(jsonOf(raw))
+
+proc profiles*(): seq[string] =
+  ## Returns the sorted list of every registered profile name.
+  let raw = retryOnce(BlobCap,
+    proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
+      ITB_Triple_Profiles(buf, cap, n))
+  for e in parseJson(jsonOf(raw)):
+    result.add(e.getStr)

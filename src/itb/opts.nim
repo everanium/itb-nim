@@ -11,8 +11,9 @@ import std/strutils
 type
   Opts* = object
     ## Builder producing the URL-query-encoded opts string consumed
-    ## by ``initPipeline`` / ``openPipeline`` / ``registerProfile``.
-    ## Every setter returns the updated builder for fluent chaining.
+    ## by ``initPipeline``. Profile registration takes a ``Profile``
+    ## record instead (see ``register``). Every setter returns the
+    ## updated builder for fluent chaining.
     pairs: seq[(string, string)]
 
 func toHexStr(data: openArray[byte]): string =
@@ -22,9 +23,7 @@ func toHexStr(data: openArray[byte]): string =
 
 func withRaw*(o: Opts, key, value: string): Opts =
   ## Escape hatch appending a raw ``key=value`` pair. Covers every
-  ## key the Go side accepts, including the register-profile grammar
-  ## (``mode``, ``width``, ``innerHashes``, ``parallaxOn``,
-  ## ``wrapperOn``, ...).
+  ## key the Go side accepts for Init overrides.
   result = o
   result.pairs.add((key, value))
 
