@@ -1,10 +1,10 @@
-## itb_eitb — command-line demonstrator for the ITB Nim binding.
+## Command-line demonstrator for the ITB Nim binding.
 ##
 ## Subcommands:
 ##
-##     itb_eitb version                                library + binding versions
-##     itb_eitb profiles                               registered profile catalogue
-##     itb_eitb encrypt <profile> <in-file> <out-file> Single Message encrypt
+##     itb_eitb version
+##     itb_eitb profiles
+##     itb_eitb encrypt <profile> <in-file> <out-file>
 ##     itb_eitb decrypt <profile> <blob-hex> <in-file> <out-file>
 ##
 ## `encrypt` prints the session blob to stderr as hex; feed that hex

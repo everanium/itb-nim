@@ -17,13 +17,13 @@ type
     ## profile JSON object; optional keys are omitted when empty /
     ## zero and decode as their defaults when absent.
     ##
-    ## ``nonceBits`` and ``barrierFill`` are inspection-only: they are
-    ## not part of the profile recipe, stay ``none`` on a record from
-    ## ``lookup`` or built by hand, and are populated only on a record
-    ## from ``inspect``, where libitb3 reads them from the blob's
-    ## runtime globals snapshot. libitb3 rejects a ``register`` payload
-    ## that carries either key, so clear both before handing an
-    ## inspected record to ``register``.
+    ## ``nonceBits``, ``barrierFill`` and ``containerMode`` are
+    ## inspection-only: they are not part of the profile recipe, stay
+    ## ``none`` on a record from ``lookup`` or built by hand, and are
+    ## populated only on a record from ``inspect``, where libitb3 reads
+    ## them from the blob's inner snapshot. libitb3 rejects a
+    ## ``register`` payload that carries any of the keys, so clear them
+    ## before handing an inspected record to ``register``.
     name*: string
       ## Registry label. Empty on a record built by hand; filled by
       ## ``lookup`` / ``inspect``. When non-empty it must equal the
@@ -47,6 +47,12 @@ type
     barrierFill*: Option[int]
       ## DRBG barrier fill margin, read from the blob's runtime
       ## globals. Same inspection-only lifecycle as ``nonceBits``.
+    containerMode*: Option[int]
+      ## Container floor sizing mode, read from the blob's inner mode
+      ## field: 1 per-region, 2 per-container. Same inspection-only
+      ## lifecycle as ``nonceBits``.
+    drbg*: string
+      ## DRBG fill primitive name; empty for the auto tier.
     macName*: string
       ## MAC name; empty for No MAC modes.
     tagStubSize*: int
@@ -93,6 +99,8 @@ proc fromJson*(_: typedesc[Profile], json: string): Profile =
     keyBits: intOf(n, "keybits"),
     nonceBits: optIntOf(n, "nonce_bits"),
     barrierFill: optIntOf(n, "barrier_fill"),
+    containerMode: optIntOf(n, "container_mode"),
+    drbg: strOf(n, "drbg"),
     macName: strOf(n, "mac"),
     tagStubSize: intOf(n, "tagstub"),
     chunkSize: intOf(n, "chunk"),
@@ -113,6 +121,8 @@ proc toJson*(p: Profile): string =
   n["keybits"] = %p.keyBits
   if p.nonceBits.isSome: n["nonce_bits"] = %p.nonceBits.get
   if p.barrierFill.isSome: n["barrier_fill"] = %p.barrierFill.get
+  if p.containerMode.isSome: n["container_mode"] = %p.containerMode.get
+  if p.drbg.len > 0: n["drbg"] = %p.drbg
   if p.macName.len > 0: n["mac"] = %p.macName
   if p.tagStubSize != 0: n["tagstub"] = %p.tagStubSize
   if p.chunkSize != 0: n["chunk"] = %p.chunkSize

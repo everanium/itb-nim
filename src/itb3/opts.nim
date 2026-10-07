@@ -80,6 +80,9 @@ func withInnerHashes*(o: Opts, names: openArray[string]): Opts =
 func withOuterCipher*(o: Opts, name: string): Opts =
   o.withRaw("outerCipher", name)
 
+func withDrbg*(o: Opts, name: string): Opts =
+  o.withRaw("drbg", name)
+
 func withParallaxPalette*(o: Opts, names: openArray[string]): Opts =
   ## Comma-joins the palette names (``parallaxPalette``).
   o.withRaw("parallaxPalette", names.join(","))

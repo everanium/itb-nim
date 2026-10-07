@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# build.sh -- one-step build for the Nim binding: builds libitb3.so,
-# type-checks the binding sources, and compiles the eitb CLI binary.
+# One-step build for the Nim binding: builds libitb3.so, type-checks
+# the binding sources, and compiles the eitb CLI binary.
 # Prerequisites (Go, Nim 2.x) must be installed separately; see
 # README.md "Prerequisites" section.
 #
@@ -40,6 +40,8 @@ CLEAN_TARGETS=(
     eitb/build            # eitb binary + its nimcache
     tests/build           # test binary + its nimcache
     bench/build           # bench binary + its nimcache
+    loop/loop             # loop stress harness binary
+    loop/nimcache         # its compiler cache
 )
 
 clean_artefacts() {
@@ -87,5 +89,13 @@ nim check --hints:off src/itb3.nim
 echo "==> compiling the eitb CLI"
 nim c -d:release --hints:off --outdir:eitb/build \
     --nimcache:eitb/build/nimcache eitb/itb_eitb.nim
+
+# The loop stress harness runs worker threads that share one Pipeline
+# handle, and an ORC `ref` crossing threads needs atomic reference
+# counts, which the compiler emits only under -d:gcAtomicArc. The rest
+# of the invocation matches the eitb line.
+echo "==> compiling the loop stress harness"
+nim c -d:release -d:gcAtomicArc --hints:off --nimcache:loop/nimcache \
+    -o:loop/loop loop/main.nim
 
 echo "==> ready: ./run_tests.sh"

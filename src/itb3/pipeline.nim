@@ -140,7 +140,7 @@ proc maxWorkers*(p: Pipeline, n: int) =
   ## Sets the worker cap for every subsequent cipher call. ``n`` is
   ## clamped by libitb3 (``<= 0`` selects auto, ``> 256`` becomes 256);
   ## only the handle state is reported. The cap is per-machine and
-  ## never travels in the blob.
+  ## never written to the blob.
   check(ITB_Triple_MaxWorkers(p.raw.h, cint(n)))
 
 proc rekey*(p: Pipeline, perm, wrap: openArray[byte]): seq[byte] {.discardable.} =
@@ -306,5 +306,15 @@ proc profiles*(): seq[string] =
   let raw = retryOnce(BlobCap,
     proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
       ITB_Triple_Profiles(buf, cap, n))
+  for e in parseJson(jsonOf(raw)):
+    result.add(e.getStr)
+
+proc hashNames*(): seq[string] =
+  ## Returns the shipped hash-primitive registry in canonical order.
+  ## The registry is the authority on which names ``initPipeline``
+  ## accepts for the ``innerHash`` opts key.
+  let raw = retryOnce(BlobCap,
+    proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
+      ITB_Triple_HashNames(buf, cap, n))
   for e in parseJson(jsonOf(raw)):
     result.add(e.getStr)

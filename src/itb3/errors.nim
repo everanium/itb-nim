@@ -53,34 +53,6 @@ type
     statusCode*: int
     lastError*: string
 
-func label*(s: Status): string =
-  ## Short human-readable label for a status code.
-  case s
-  of stOk: "ok"
-  of stBadHash: "unknown hash name"
-  of stBadKeyBits: "invalid key bits"
-  of stBadHandle: "invalid handle"
-  of stBadInput: "invalid input"
-  of stBufferTooSmall: "output buffer too small"
-  of stEncryptFailed: "encrypt failed"
-  of stDecryptFailed: "decrypt failed"
-  of stSeedWidthMix: "seed width mismatch"
-  of stBadMac: "unknown MAC name or invalid MAC handle"
-  of stMacFailure: "MAC verification failed"
-  of stBlobMalformedRecipe: "blob recipe malformed"
-  of stRecipePrimitiveUnknown: "blob recipe names an unknown primitive"
-  of stUnknownProfile: "unknown profile name"
-  of stReserved14, stReserved15, stReserved16, stReserved17: "reserved status"
-  of stBlobModeMismatch: "blob mode mismatch"
-  of stBlobMalformed: "malformed state blob"
-  of stBlobVersionTooNew: "blob version too new"
-  of stBlobTooManyOpts: "too many blob export opts"
-  of stStreamTruncated: "stream truncated before terminator"
-  of stStreamAfterFinal: "stream chunk after terminator"
-  of stTripleClosed: "Triple Pipeline is closed"
-  of stProfileExists: "profile name already registered"
-  of stInternal: "internal error"
-
 func statusFrom*(code: int): Status =
   ## Maps a raw return code onto ``Status``; unknown codes (including
   ## the enum holes) collapse to ``stInternal``.
@@ -120,11 +92,8 @@ proc newItbError*(status: Status, statusCode: int,
                           lastError: lastError)
   if statusCode < 0:
     result.msg = "itb: " & lastError
-  elif lastError.len > 0:
-    result.msg = "itb: status=" & $statusCode & " (" & status.label &
-        "): " & lastError
   else:
-    result.msg = "itb: status=" & $statusCode & " (" & status.label & ")"
+    result.msg = "itb: status=" & $statusCode & ": " & lastError
 
 proc raiseBindingError*(message: string) =
   ## Raises an ``ItbError`` for a binding-side failure (no libitb3

@@ -21,6 +21,10 @@ suite "itb nim binding":
     check v.len > 0
     check v[0] in {'0' .. '9'}
 
+  test "drbg auto tier is a fill cipher":
+    let tier = drbgAutoTier()
+    check tier in ["aes-256-ctr", "chacha20"]
+
   test "profiles list":
     let names = profiles()
     check "singlemsg-triple-mac-v1" in names
@@ -249,6 +253,7 @@ suite "itb nim binding":
     var recipe = prof
     recipe.nonceBits = none(int)
     recipe.barrierFill = none(int)
+    recipe.containerMode = none(int)
     check recipe == lookup("singlemsg-triple-mac-v1")
     try:
       discard inspect("not a blob".toOpenArrayByte(0, 9))
@@ -393,3 +398,102 @@ suite "itb nim binding":
         @(plain.toOpenArrayByte(0, plain.len - 1))
     receiver.free()
     sender.free()
+
+  test "hash registry enumeration":
+    let names = hashNames()
+    check names.len > 0
+    check "areion512" in names
+    check "aesitb128" in names
+    check "nope" notin names
+
+  test "runtime knobs":
+    # GOMAXPROCS: the setter returns the previous value and zero is
+    # the query form, so the original is restored afterwards.
+    let original = setGomaxprocs(0)
+    check original > 0
+    check setGomaxprocs(2) == original
+    check setGomaxprocs(0) == 2
+    discard setGomaxprocs(original)
+
+    # The pool-counter vector is sized from the library's own length
+    # query and every slot is filled.
+    let slots = poolStatsLen()
+    check slots >= 9
+    var counters = newSeq[int64](slots)
+    check poolStats(counters) == slots
+    check counters[0] > 0
+    var tooSmall = newSeq[int64](1)
+    expect ItbError:
+      discard poolStats(tooSmall)
+
+  test "heap profile":
+    let path = getTempDir() / "itb-nim-heap.pprof"
+    removeFile(path)
+    writeHeapProfile(path)
+    check fileExists(path)
+    check getFileSize(path) > 0
+    removeFile(path)
+    expect ItbError:
+      writeHeapProfile("/proc/itb-no-such-directory/heap.pprof")
+
+  test "drbg choice round trips and travels in the blob":
+    for drbgName in ["csprng", "aesitb128"]:
+      let sender = initPipeline("singlemsg-triple-mac-v1",
+                                Opts().withDrbg(drbgName))
+      let blob = sender.save
+      let receiver = loadPipeline(blob)
+      let wire = sender.encryptMessage("drbg payload")
+      check receiver.decryptMessage(wire) ==
+          @("drbg payload".toOpenArrayByte(0, 11))
+      let back = receiver.encryptMessage("drbg reply")
+      check sender.decryptMessage(back) ==
+          @("drbg reply".toOpenArrayByte(0, 9))
+      # The choice is a recipe field: inspect reports it.
+      let prof = inspect(blob)
+      check prof.drbg == drbgName
+      check prof.toJson.contains("\"drbg\":\"" & drbgName & "\"")
+      receiver.free()
+      sender.free()
+
+  test "drbg is absent by default":
+    let sender = initPipeline("singlemsg-triple-mac-v1")
+    let prof = inspect(sender.save)
+    check prof.drbg.len == 0
+    check not prof.toJson.contains("drbg")
+    sender.free()
+    let registry = lookup("singlemsg-triple-mac-v1")
+    check registry.drbg.len == 0
+    check not registry.toJson.contains("drbg")
+
+  test "register copy of an inspected record keeps drbg":
+    let name = "nim-binding-test-drbg-copy-" & $getCurrentProcessId()
+    let sender = initPipeline("singlemsg-triple-mac-v1",
+                              Opts().withDrbg("csprng"))
+    # drbg is a recipe field and stays; the name and the
+    # inspection-only fields are cleared before registering.
+    var recipe = inspect(sender.save)
+    sender.free()
+    recipe.name = ""
+    recipe.nonceBits = none(int)
+    recipe.barrierFill = none(int)
+    recipe.containerMode = none(int)
+    check recipe.drbg == "csprng"
+    register(name, recipe)
+    let back = lookup(name)
+    check back.drbg == "csprng"
+    check back.toJson.contains("\"drbg\":\"csprng\"")
+    let p = initPipeline(name)
+    let receiver = loadPipeline(p.save)
+    let wire = p.encryptMessage("registered drbg")
+    check receiver.decryptMessage(wire) ==
+        @("registered drbg".toOpenArrayByte(0, 14))
+    receiver.free()
+    p.free()
+
+  test "unknown drbg name is recipe primitive unknown":
+    try:
+      discard initPipeline("singlemsg-triple-mac-v1", Opts().withDrbg("nope"))
+      check false
+    except ItbError as e:
+      check e.status == stRecipePrimitiveUnknown
+      check e.msg.contains("nope")

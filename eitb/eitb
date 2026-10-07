@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# eitb -- launcher for the Nim binding's CLI demonstrator. Compiles
-# the binary on first use (or after a source change), then forwards
+# Launcher for the Nim binding's CLI demonstrator. Compiles the
+# binary on first use (or after a source change), then forwards
 # every argument to it.
 
 set -eu

@@ -59,6 +59,8 @@ proc itbLibPath*(): string =
 
 proc ITB_Version*(outBuf: pointer, capBytes: csize_t,
                   outLen: ptr csize_t): cint
+proc ITB_DRBGAutoTier*(outBuf: pointer, capBytes: csize_t,
+                       outLen: ptr csize_t): cint
 proc ITB_LastError*(outBuf: pointer, capBytes: csize_t,
                     outLen: ptr csize_t): cint
 proc ITB_SetMemoryLimit*(limit: int64): int64
@@ -115,6 +117,13 @@ proc ITB_Triple_StreamRead*(stream: csize_t, outBuf: pointer,
                             outCap: csize_t, outLen: ptr csize_t,
                             finished: ptr cint): cint
 proc ITB_Triple_StreamFree*(stream: csize_t): cint
+proc ITB_SetGOMAXPROCS*(n: cint): cint
+proc ITB_WriteHeapProfile*(path: cstring): cint
+proc ITB_PoolStatsLen*(): cint
+proc ITB_PoolStats*(outBuf: ptr int64, capElems: csize_t,
+                    outLen: ptr csize_t): cint
+proc ITB_Triple_HashNames*(jsonOut: pointer, jsonCap: csize_t,
+                           jsonLen: ptr csize_t): cint
 
 {.pop.}
 

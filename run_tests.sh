@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# run_tests.sh -- one-step test runner for the Nim binding. Builds
-# libitb3.so via build.sh, points ITB_LIBITB3_PATH at the freshly-built
-# shared library, then compiles and runs the unittest suite.
-# Positional arguments are forwarded to the test binary (e.g. a
-# single test via `./run_tests.sh "message round trip"`).
+# One-step test runner for the Nim binding. Builds libitb3.so via
+# build.sh, points ITB_LIBITB3_PATH at the freshly-built shared
+# library, then compiles and runs the unittest suite. Positional
+# arguments are forwarded to the test binary (e.g. a single test via
+# `./run_tests.sh "message round trip"`).
 #
 # Usage:
 #   ./run_tests.sh                         # full suite

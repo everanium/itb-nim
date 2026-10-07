@@ -105,7 +105,7 @@ proc benchMessage() =
   pipe.free()
 
 proc benchStreamOneShot() =
-  ## Whole-buffer stream: one FFI round trip through
+  ## One-shot stream: one FFI round trip through
   ## encryptStreamOneShot / decryptStreamOneShot per iteration.
   let pipe = initPipeline(profileName("ITB_STREAM_PROFILE",
                                       "streaming-noaead-triple-v1"),
@@ -190,9 +190,9 @@ proc benchStream() =
   pipe.free()
 
 when isMainModule:
-  # Bench-scale allocation churn leaks Go scratch heap unboundedly
-  # without a soft memory cap + aggressive GC; the return values
-  # report the previous settings, not an error.
+  # Bench-scale allocation churn grows the Go scratch heap
+  # unboundedly without a soft memory cap + aggressive GC; the
+  # return values report the previous settings, not an error.
   discard setMemoryLimit(4 * 1024 * 1024 * 1024)
   discard setGcPercent(100)
 
