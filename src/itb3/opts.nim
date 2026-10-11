@@ -27,6 +27,10 @@ func withRaw*(o: Opts, key, value: string): Opts =
   result = o
   result.pairs.add((key, value))
 
+func withMode*(o: Opts, n: int): Opts =
+  ## Overrides the container floor sizing mode: 1 (per-region, default) or 2 (per-container compact).
+  o.withRaw("mode", $n)
+
 func withPermMaster*(o: Opts, master: openArray[byte]): Opts =
   ## Hex-encodes the parallax master override (``pm``).
   o.withRaw("pm", toHexStr(master))

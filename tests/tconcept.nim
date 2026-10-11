@@ -267,23 +267,28 @@ suite "itb nim binding":
     # barrier fill margin, and inspect surfaces both.
     let sender = initPipeline("singlemsg-triple-mac-v1")
     let prof = inspect(sender.save)
+    check prof.containerMode == some(1)
     check prof.nonceBits == some(512)
     check prof.barrierFill == some(1)
     sender.free()
     # Per-Pipeline overrides travel through the blob into inspect.
     let tuned = initPipeline("singlemsg-triple-mac-v1",
-                             Opts().withNonceBits(256).withBarrierFill(4))
+                             Opts().withMode(2).withNonceBits(256).withBarrierFill(4))
     let tunedProf = inspect(tuned.save)
+    check tunedProf.containerMode == some(2)
     check tunedProf.nonceBits == some(256)
     check tunedProf.barrierFill == some(4)
+    check tunedProf.toJson.contains("\"container_mode\":2")
     check tunedProf.toJson.contains("\"nonce_bits\":256")
     check tunedProf.toJson.contains("\"barrier_fill\":4")
     tuned.free()
     # The registry entry is the recipe alone — neither field is part
     # of it, so both read as absent rather than as zero.
     let registry = lookup("singlemsg-triple-mac-v1")
+    check registry.containerMode.isNone
     check registry.nonceBits.isNone
     check registry.barrierFill.isNone
+    check not registry.toJson.contains("container_mode")
     check not registry.toJson.contains("nonce_bits")
     check not registry.toJson.contains("barrier_fill")
 

@@ -87,7 +87,7 @@ The resolved shape travels inside the blob, so the receiver needs no
 options of its own:
 
 ```nim
-let opts = Opts().withChunkSize(65536).withWrapper(false).withMaxWorkers(4)
+let opts = Opts().withMode(2).withChunkSize(65536).withWrapper(false).withMaxWorkers(4)
 let sender = initPipeline("singlemsg-triple-mac-v1", opts)
 let receiver = loadPipeline(sender.save)
 ```

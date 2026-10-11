@@ -524,38 +524,6 @@ proc logPipelineInitialised(profileName: string, blob: seq[byte]) =
     line.add(" drbg=" & record.drbg)
   logLine(line)
 
-proc editInnerBlobMode(blob: var seq[byte], targetMode: int): bool =
-  ## Sets the inner blob's "mode" field of a wrap-layer session blob to
-  ## `targetMode` (1 = per-region, 2 = per-container) in place. The wrap
-  ## layer's profile record carries its own "mode" (a string), so the
-  ## search starts at the inner blob ("ib"); both shipped modes are one
-  ## digit wide, so the blob length does not change. Returns false when
-  ## the inner blob or its mode field is not found.
-  proc find(hay: seq[byte], needle: string, start: int): int =
-    for i in start .. hay.len - needle.len:
-      var hit = true
-      for k in 0 ..< needle.len:
-        if hay[i + k] != byte(needle[k]):
-          hit = false
-          break
-      if hit:
-        return i
-    -1
-  const ibKey = "\"ib\":{"
-  const modeKey = "\"mode\":"
-  let ib = find(blob, ibKey, 0)
-  if ib < 0:
-    return false
-  let mode = find(blob, modeKey, ib + ibKey.len)
-  if mode < 0:
-    return false
-  let at = mode + modeKey.len
-  if at + 1 >= blob.len or blob[at] < byte('1') or blob[at] > byte('2') or
-      (blob[at + 1] >= byte('0') and blob[at + 1] <= byte('9')):
-    return false
-  blob[at] = byte(ord('0') + targetMode)
-  true
-
 proc buildPipeline(cfg: Config, profileName: string, pipe: var Pipeline,
                    present: var bool, blob: var seq[byte]): bool =
   ## Constructs one Pipeline against `profile` with every flag-carried
@@ -565,6 +533,9 @@ proc buildPipeline(cfg: Config, profileName: string, pipe: var Pipeline,
   ## blob back, and the bytes are the ones Init produced. Later blob
   ## reopens use the retained blob; save is never called again.
   var opts = Opts()
+  if cfg.blobMode != 1:
+    opts = opts.withMode(cfg.blobMode)
+  opts = opts
     .withInnerHash(cfg.hash)
     .withMacName(cfg.mac)
     .withParallax(cfg.parallax)
@@ -593,21 +564,6 @@ proc buildPipeline(cfg: Config, profileName: string, pipe: var Pipeline,
   except ItbError as e:
     errLine("Save(" & profileName & "): " & detail(e))
     return false
-  if cfg.blobMode == 2:
-    # The sizing mode is not an Opts knob: the Init blob is edited and
-    # the pipeline reopened from it, so the retained blob (the one
-    # blob-cycle reopens from) carries the edited mode.
-    if not editInnerBlobMode(blob, 2):
-      errLine("rewrite blob mode: inner blob mode field not found")
-      return false
-    var fresh: Pipeline
-    try:
-      fresh = loadPipeline(blob)
-    except ItbError as e:
-      errLine("reload Mode 2 blob: " & detail(e))
-      return false
-    pipe.free()
-    pipe = fresh
   logPipelineInitialised(profileName, blob)
   true
 
