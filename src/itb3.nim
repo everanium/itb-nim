@@ -28,6 +28,6 @@ import itb3/runtime
 
 export errors, opts, pipeline, stream, runtime
 
-const ItbNimVersion* = "0.6.1"
+const ItbNimVersion* = "0.7.1"
   ## Binding version. Tracks the Nim wrapper; call ``version()`` for
   ## the underlying libitb3 library version.
