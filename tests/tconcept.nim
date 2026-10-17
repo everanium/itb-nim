@@ -49,6 +49,42 @@ suite "itb nim binding":
     receiver.free()
     sender.free()
 
+  test "initPipelineKeys determinism and errors":
+    var masters = newSeq[seq[byte]](8)
+    for i in 0 ..< 8:
+      masters[i] = newSeq[byte](32)
+      for j in 0 ..< 32:
+        masters[i][j] = byte(0x11 * (i + 1))
+
+    let k1 = initPipelineKeys("singlemsg-triple-mac-v1", masters)
+    let k2 = initPipelineKeys("singlemsg-triple-mac-v1", masters, initOpts())
+    check k1.save == k2.save
+
+    let plain = payload(512, 99)
+    let wire = k1.encryptMessage(plain)
+    let back = k2.decryptMessage(wire)
+    check back == plain
+    k1.free()
+    k2.free()
+
+    # Duplicate key must fail with stBadInput.
+    var dupMasters = masters
+    dupMasters[1] = dupMasters[0]
+    try:
+      discard initPipelineKeys("singlemsg-triple-mac-v1", dupMasters)
+      check false
+    except ItbError as e:
+      check e.status == stBadInput
+
+    # Short (< 16 bytes) key must fail with stBadInput.
+    var shortMasters = masters
+    shortMasters[0] = newSeq[byte](8)
+    try:
+      discard initPipelineKeys("singlemsg-triple-mac-v1", shortMasters)
+      check false
+    except ItbError as e:
+      check e.status == stBadInput
+
   test "stream round trip":
     let sender = initPipeline("streaming-noaead-triple-v1")
     let receiver = loadPipeline(sender.save)

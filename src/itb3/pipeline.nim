@@ -84,6 +84,44 @@ proc initPipeline*(profile: string, opts = Opts()): Pipeline =
                       addr handle))
   Pipeline(raw: PipeHandle(h: handle))
 
+proc initPipelineKeys*(profile: string, masters: openArray[seq[byte]],
+                       opts: Opts = initOpts()): Pipeline =
+  ## Constructs a Pipeline from caller-supplied master keys (8 for
+  ## MAC profiles, 7 for No-MAC profiles, plus optional Parallax and
+  ## Wrapper masters). Key counts, lengths, and pairwise distinctness
+  ## are validated by libitb3.
+  let optsStr = opts.build
+  var flatLen = 0
+  for m in masters:
+    flatLen += m.len
+  var flat = newSeq[byte](flatLen)
+  defer:
+    if flat.len > 0:
+      zeroMem(addr flat[0], flat.len)
+  var lens = newSeq[csize_t](masters.len)
+  var off = 0
+  for i, m in masters:
+    lens[i] = csize_t(m.len)
+    if m.len > 0:
+      copyMem(addr flat[off], unsafeAddr m[0], m.len)
+      off += m.len
+  let flatPtr = toPtr(flat)
+  let flatTotal = csize_t(flat.len)
+  let lensPtr = if lens.len > 0: addr lens[0] else: nil
+  let count = csize_t(lens.len)
+  var handle: csize_t = 0
+  discard retryOnce(BlobCap,
+    proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
+      ITB_Triple_InitKeys(profile.cstring, optsStr.cstring,
+                          flatPtr, flatTotal, lensPtr, count,
+                          buf, cap, n, addr handle))
+  Pipeline(raw: PipeHandle(h: handle))
+
+proc initPipelineKeys*(profile: string, opts: Opts,
+                       masters: openArray[seq[byte]]): Pipeline =
+  ## Overload of ``initPipelineKeys`` with ``opts`` preceding ``masters``.
+  initPipelineKeys(profile, masters, opts)
+
 func mastersCount(permLen, wrapLen: int): csize_t =
   ## The masters pair crosses as (perm, wrap, count): both absent
   ## yields 0, otherwise 2 — libitb3 validates the pair.

@@ -69,6 +69,11 @@ proc ITB_SetGCPercent*(pct: cint): cint
 proc ITB_Triple_Init*(profile: cstring, opts: cstring, blobOut: pointer,
                       blobCap: csize_t, blobLen: ptr csize_t,
                       outHandle: ptr csize_t): cint
+proc ITB_Triple_InitKeys*(profile: cstring, opts: cstring,
+                          mastersFlat: pointer, mastersFlatLen: csize_t,
+                          masterLens: ptr csize_t, mastersCount: csize_t,
+                          blobOut: pointer, blobCap: csize_t,
+                          blobLen: ptr csize_t, outHandle: ptr csize_t): cint
 proc ITB_Triple_Load*(blob: pointer, blobLen: csize_t,
                       permMaster: pointer, permMasterLen: csize_t,
                       wrapMaster: pointer, wrapMasterLen: csize_t,

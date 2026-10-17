@@ -13,7 +13,7 @@ declarations — no compile-time link against libitb3; the
 Every hash-name / MAC-name / cipher-name / profile-name is an opaque
 string passed through to Go for validation; the binding carries no
 ITB construction logic. The public surface is the `itb3` module
-(`initPipeline` / `loadPipeline` / `loadPipelineF` / `version` /
+(`initPipeline` / `initPipelineKeys` / `loadPipeline` / `loadPipelineF` / `version` /
 `drbgAutoTier`, the
 `Profile` record with `register` / `lookup` / `profiles` / `inspect`,
 and the Go runtime knobs), the `Pipeline`
@@ -91,6 +91,8 @@ let opts = Opts().withMode(2).withChunkSize(65536).withWrapper(false).withMaxWor
 let sender = initPipeline("singlemsg-triple-mac-v1", opts)
 let receiver = loadPipeline(sender.save)
 ```
+
+`initPipelineKeys` constructs a Pipeline from caller-supplied master keys (8 for MAC profiles, 7 for No-MAC profiles, plus optional Parallax and Wrapper masters; each >= 16 bytes and pairwise distinct) instead of sampling fresh entropy via `initPipeline`.
 
 `rekey` rotates the parallax + wrapper masters mid-session (the
 eight ITB seeds and MAC key are fixed for the session lifetime by

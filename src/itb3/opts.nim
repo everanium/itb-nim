@@ -16,6 +16,10 @@ type
     ## updated builder for fluent chaining.
     pairs: seq[(string, string)]
 
+func initOpts*(): Opts =
+  ## Constructs an empty ``Opts`` builder.
+  Opts()
+
 func toHexStr(data: openArray[byte]): string =
   result = newStringOfCap(data.len * 2)
   for b in data:
