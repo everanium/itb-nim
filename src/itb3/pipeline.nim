@@ -5,6 +5,7 @@
 ## (or ``close``) releases the Go-side state deterministically.
 
 import std/json
+import std/volatile
 
 import ./errors
 import ./ffi_bridge
@@ -48,6 +49,10 @@ func outCap*(payload: int): int =
   ## ``max(131072, payload * 5/4 + 131072)``.
   max(payload + payload div 4 + 131_072, 131_072)
 
+proc wipeBytes(buf: var seq[byte]) {.inline.} =
+  for i in 0 ..< buf.len:
+    volatileStore(addr buf[i], 0'u8)
+
 proc retryOnce*(cap0: int,
                 call: proc (buf: pointer, cap: csize_t,
                             n: ptr csize_t): cint): seq[byte] =
@@ -60,9 +65,15 @@ proc retryOnce*(cap0: int,
   var n: csize_t = 0
   var rc = call(addr buf[0], csize_t(buf.len), addr n)
   if int(rc) == ord(stBufferTooSmall) and int(n) > buf.len:
+    wipeBytes(buf)
     buf = newSeq[byte](int(n))
     rc = call(addr buf[0], csize_t(buf.len), addr n)
+  if int(rc) != ord(stOk):
+    wipeBytes(buf)
   check(rc)
+  if int(n) < buf.len:
+    for i in int(n) ..< buf.len:
+      volatileStore(addr buf[i], 0'u8)
   buf.setLen(int(n))
   buf
 
@@ -78,10 +89,11 @@ proc initPipeline*(profile: string, opts = Opts()): Pipeline =
   ## attempt is closed by libitb3 before returning).
   let optsStr = opts.build
   var handle: csize_t = 0
-  discard retryOnce(BlobCap,
+  var blob = retryOnce(BlobCap,
     proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
       ITB_Triple_Init(profile.cstring, optsStr.cstring, buf, cap, n,
                       addr handle))
+  wipeBytes(blob)
   Pipeline(raw: PipeHandle(h: handle))
 
 proc initPipelineKeys*(profile: string, masters: openArray[seq[byte]],
@@ -96,8 +108,7 @@ proc initPipelineKeys*(profile: string, masters: openArray[seq[byte]],
     flatLen += m.len
   var flat = newSeq[byte](flatLen)
   defer:
-    if flat.len > 0:
-      zeroMem(addr flat[0], flat.len)
+    wipeBytes(flat)
   var lens = newSeq[csize_t](masters.len)
   var off = 0
   for i, m in masters:
@@ -110,11 +121,12 @@ proc initPipelineKeys*(profile: string, masters: openArray[seq[byte]],
   let lensPtr = if lens.len > 0: addr lens[0] else: nil
   let count = csize_t(lens.len)
   var handle: csize_t = 0
-  discard retryOnce(BlobCap,
+  var blob = retryOnce(BlobCap,
     proc (buf: pointer, cap: csize_t, n: ptr csize_t): cint =
       ITB_Triple_InitKeys(profile.cstring, optsStr.cstring,
                           flatPtr, flatTotal, lensPtr, count,
                           buf, cap, n, addr handle))
+  wipeBytes(blob)
   Pipeline(raw: PipeHandle(h: handle))
 
 proc initPipelineKeys*(profile: string, opts: Opts,

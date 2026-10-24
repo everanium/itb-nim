@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.7.4"
+version       = "0.7.5"
 author        = "Andrey Kuvshinov <andrew@encloud.blue>"
 description   = "ITB Symmetric Cipher Construction with Ambiguity-Based Security - Nim"
 license       = "Apache-2.0"
