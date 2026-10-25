@@ -72,6 +72,7 @@ type
     chunkSize*: int64       ## 0 = profile default
     barrierFill*: int       ## 0 = profile default
     drbg*: string           ## DRBG fill primitive; empty = profile default (auto tier)
+    interlock*: string      ## Interlocked Barrier chunk width: 48 | 168; empty = profile default
     gomaxprocs*: int        ## 0 = inherit from the environment
     rekeyEvery*: int64      ## per-worker iterations between rotations; 0 = never
     blobCycleEvery*: int64  ## per-worker iterations between reopens; 0 = never

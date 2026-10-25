@@ -74,6 +74,7 @@ type
     gomaxprocs: int
     goroutines: int
     hash: string
+    interlock: string
     iterations: int64
     jsonOutput: bool
     keyBits: int
@@ -106,7 +107,8 @@ proc defaults(): RawFlags =
   RawFlags(
     barrierFill: 0, blobCycleEvery: 0, blobMode: 1, chunkSize: "0", drbg: "",
     duration: "5m",
-    gogc: 0, gomaxprocs: 0, goroutines: 3, hash: "areion512", iterations: 0,
+    gogc: 0, gomaxprocs: 0, goroutines: 3, hash: "areion512", interlock: "",
+    iterations: 0,
     jsonOutput: false, keyBits: 0, mac: "hmac-blake3", memlimit: "auto",
     memprofile: "", nonceBits: 0, parallax: "on", payloadMode: "fixed",
     payloadSize: "16MB", profile: "", rekeyEvery: 0, seed: 0,
@@ -177,6 +179,8 @@ proc flagTable(f: ptr RawFlags): seq[Flag] =
   t.addInt("goroutines", addr f.goroutines,
     "concurrent workers (1..10); on runtimes without parallelism values above 1 are clamped to 1")
   t.addString("hash", "string", addr f.hash, "inner ITB hash primitive name")
+  t.addString("interlock", "string", addr f.interlock,
+    "Interlocked Barrier chunk width: 48 | 168; empty = profile default (48; 168 requires 512-bit hash)")
   t.addInt64("iterations", addr f.iterations,
     "fixed per-worker iteration count; 0 = duration-based")
   t.addBool("json-output", addr f.jsonOutput,
@@ -438,6 +442,11 @@ proc parseFlags(argv: seq[string], cfg: var Config): int =
             $cfg.barrierFill)
     return -1
   cfg.drbg = f.drbg # validated by Init: the C ABI enumerates no DRBG names
+  cfg.interlock = f.interlock
+  if cfg.interlock notin ["", "48", "168"]:
+    errLine("--interlock must be 48 | 168 (or empty = profile default), got \"" &
+            cfg.interlock & "\"")
+    return -1
   if not parseSize(f.chunkSize, cfg.chunkSize):
     errLine("--chunk-size: invalid size \"" & f.chunkSize & "\"")
     return -1
@@ -522,6 +531,8 @@ proc logPipelineInitialised(profileName: string, blob: seq[byte]) =
     line.add(" container-mode=2")
   if record.drbg.len > 0:
     line.add(" drbg=" & record.drbg)
+  if record.interlock.len > 0:
+    line.add(" interlock=" & record.interlock)
   logLine(line)
 
 proc buildPipeline(cfg: Config, profileName: string, pipe: var Pipeline,
@@ -544,6 +555,7 @@ proc buildPipeline(cfg: Config, profileName: string, pipe: var Pipeline,
     .withNonceBits(cfg.nonceBits)
     .withBarrierFill(cfg.barrierFill)
     .withDrbg(cfg.drbg)
+    .withInterlock(cfg.interlock)
     .withChunkSize(int(cfg.chunkSize))
   if cfg.profile.len > 0:
     let filled = fillKeystreamLayers(cfg.profile, opts, cfg.parallax, cfg.wrapper)
@@ -631,7 +643,8 @@ proc run(argv: seq[string]): int =
           " seed=" & $cfg.seed &
           " json-output=" & (if cfg.jsonOutput: "true" else: "false") &
           (if cfg.blobMode != 1: " blob-mode=" & $cfg.blobMode else: "") &
-          (if cfg.drbg.len > 0: " drbg=" & cfg.drbg else: ""))
+          (if cfg.drbg.len > 0: " drbg=" & cfg.drbg else: "") &
+          (if cfg.interlock.len > 0: " interlock=" & cfg.interlock else: ""))
   logLine("policy: microbatch-tiers=" & policyLabel("ITB_MICROBATCH_TIERS") &
           " hashpool-starters=" & policyLabel("ITB_HASHPOOL_STARTERS"))
 

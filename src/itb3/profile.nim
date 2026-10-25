@@ -53,6 +53,8 @@ type
       ## lifecycle as ``nonceBits``.
     drbg*: string
       ## DRBG fill primitive name; empty for the auto tier.
+    interlock*: string
+      ## Interlocked Barrier chunk width ("48" or "168"); empty for the 48-bit default.
     macName*: string
       ## MAC name; empty for No MAC modes.
     tagStubSize*: int
@@ -101,6 +103,7 @@ proc fromJson*(_: typedesc[Profile], json: string): Profile =
     barrierFill: optIntOf(n, "barrier_fill"),
     containerMode: optIntOf(n, "container_mode"),
     drbg: strOf(n, "drbg"),
+    interlock: strOf(n, "interlock"),
     macName: strOf(n, "mac"),
     tagStubSize: intOf(n, "tagstub"),
     chunkSize: intOf(n, "chunk"),
@@ -123,6 +126,7 @@ proc toJson*(p: Profile): string =
   if p.barrierFill.isSome: n["barrier_fill"] = %p.barrierFill.get
   if p.containerMode.isSome: n["container_mode"] = %p.containerMode.get
   if p.drbg.len > 0: n["drbg"] = %p.drbg
+  if p.interlock.len > 0: n["interlock"] = %p.interlock
   if p.macName.len > 0: n["mac"] = %p.macName
   if p.tagStubSize != 0: n["tagstub"] = %p.tagStubSize
   if p.chunkSize != 0: n["chunk"] = %p.chunkSize

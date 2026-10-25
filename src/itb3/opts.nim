@@ -35,6 +35,10 @@ func withMode*(o: Opts, n: int): Opts =
   ## Overrides the container floor sizing mode: 1 (per-region, default) or 2 (per-container compact).
   o.withRaw("mode", $n)
 
+func withInterlock*(o: Opts, interlock: string): Opts =
+  ## Overrides the Interlocked Barrier chunk width: "48" (default) or "168" (requires 512-bit hash).
+  o.withRaw("interlock", interlock)
+
 func withPermMaster*(o: Opts, master: openArray[byte]): Opts =
   ## Hex-encodes the parallax master override (``pm``).
   o.withRaw("pm", toHexStr(master))

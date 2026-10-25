@@ -538,3 +538,40 @@ suite "itb nim binding":
     except ItbError as e:
       check e.status == stRecipePrimitiveUnknown
       check e.msg.contains("nope")
+
+  test "interlock 168 round trips, travels in the blob, and rejects invalid inputs":
+    let sender = initPipeline("singlemsg-triple-mac-v1",
+                              Opts().withInterlock("168"))
+    let blob = sender.save
+    let receiver = loadPipeline(blob)
+    let wire = sender.encryptMessage("interlock payload")
+    check receiver.decryptMessage(wire) ==
+        @("interlock payload".toOpenArrayByte(0, 16))
+    let back = receiver.encryptMessage("interlock reply")
+    check sender.decryptMessage(back) ==
+        @("interlock reply".toOpenArrayByte(0, 14))
+    let prof = inspect(blob)
+    check prof.interlock == "168"
+    check prof.toJson.contains("\"interlock\":\"168\"")
+    receiver.free()
+    sender.free()
+
+    let defPipe = initPipeline("singlemsg-triple-mac-v1")
+    let defProf = inspect(defPipe.save)
+    check defProf.interlock.len == 0
+    check not defProf.toJson.contains("interlock")
+    defPipe.free()
+
+    try:
+      discard initPipeline("singlemsg-triple-mac-v1",
+                           Opts().withInnerHash("blake3").withInterlock("168"))
+      check false
+    except ItbError as e:
+      check e.status == stBadInput
+
+    try:
+      discard initPipeline("singlemsg-triple-mac-v1",
+                           Opts().withInterlock("96"))
+      check false
+    except ItbError as e:
+      check e.status == stBadInput

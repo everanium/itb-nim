@@ -224,6 +224,7 @@ proc finalSummary*(r: ptr RunState, elapsedNs: int64): int =
     j.add(",\"blob_mode\":" & $cfg.blobMode)
     j.add(",\"drbg\":" & jsonString(cfg.drbg))
     j.add(",\"drbg_auto_tier\":" & jsonString(drbgAutoTier()))
+    j.add(",\"interlock\":" & jsonString(cfg.interlock))
     j.add(",\"chunk_size_bytes\":" & $cfg.chunkSize)
     j.add(",\"barrier_fill\":" & $cfg.barrierFill)
     j.add(",\"parallax\":\"" & onOff(cfg.parallax) & "\"")
