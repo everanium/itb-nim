@@ -165,7 +165,7 @@ proc flagTable(f: ptr RawFlags): seq[Flag] =
   t.addInt64("blob-cycle-every", addr f.blobCycleEvery,
     "reopen each pipeline from its session blob every N iterations per worker; 0 = never")
   t.addInt("blob-mode", addr f.blobMode,
-    "container floor sizing mode: 1 (per-region, default) | 2 (per-container)")
+    "container floor sizing mode: 1 (per-region, default) | 2 (per-container) | 3 (gauss-posit)")
   t.addString("chunk-size", "string", addr f.chunkSize,
     "streaming chunk-size budget (e.g. 4MB); 0 = profile default; inert for pure message shape")
   t.addString("drbg", "string", addr f.drbg,
@@ -432,8 +432,8 @@ proc parseFlags(argv: seq[string], cfg: var Config): int =
             $cfg.nonceBits)
     return -1
   cfg.blobMode = f.blobMode
-  if cfg.blobMode notin [1, 2]:
-    errLine("--blob-mode must be 1 (per-region) | 2 (per-container), got " &
+  if cfg.blobMode notin [1, 2, 3]:
+    errLine("--blob-mode must be 1 (per-region) | 2 (per-container) | 3 (gauss-posit), got " &
             $cfg.blobMode)
     return -1
   cfg.barrierFill = f.barrierFill
@@ -527,8 +527,8 @@ proc logPipelineInitialised(profileName: string, blob: seq[byte]) =
           " mac=" & (if record.macName.len > 0: record.macName else: "-") &
           " parallax=" & onOff(record.parallax) &
           " wrapper=" & onOff(record.wrapper)
-  if record.containerMode.get(0) == 2:
-    line.add(" container-mode=2")
+  if record.containerMode.get(0) == 2 or record.containerMode.get(0) == 3:
+    line.add(" container-mode=" & $record.containerMode.get(0))
   if record.drbg.len > 0:
     line.add(" drbg=" & record.drbg)
   if record.interlock.len > 0:

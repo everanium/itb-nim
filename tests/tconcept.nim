@@ -318,6 +318,12 @@ suite "itb nim binding":
     check tunedProf.toJson.contains("\"nonce_bits\":256")
     check tunedProf.toJson.contains("\"barrier_fill\":4")
     tuned.free()
+    let tuned3 = initPipeline("singlemsg-triple-mac-v1",
+                              Opts().withMode(3))
+    let tunedProf3 = inspect(tuned3.save)
+    check tunedProf3.containerMode == some(3)
+    check tunedProf3.toJson.contains("\"container_mode\":3")
+    tuned3.free()
     # The registry entry is the recipe alone — neither field is part
     # of it, so both read as absent rather than as zero.
     let registry = lookup("singlemsg-triple-mac-v1")
